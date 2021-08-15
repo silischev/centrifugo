@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         go-version: [1.16.6]
+        tarantool-version: [2.7.1]
     steps:
       - name: Install Go
         uses: actions/setup-go@v2
@@ -32,5 +33,29 @@ jobs:
       - name: Install cover
         run: GO111MODULE=off go get golang.org/x/tools/cmd/cover
 
+      - name: Checkout tarantool-engine repo
+        uses: actions/checkout@v2
+        with:
+          repository: silischev/tarantool-engine
+          ref: test_ci
+          path: ./tarantool-engine
+
+      - name: Start Tarantool into tarantool-engine repo
+        working-directory: tarantool-engine
+        run: |
+          chmod -R 777 ./tmp
+          docker run --name tarantool -d -e TARANTOOL_WORKDIR='/opt/tarantool/tmp' -p 3301:3301 -v $(pwd):/opt/tarantool tarantool/tarantool:${{ matrix.tarantool-version }} /bin/sh -c "tarantoolctl rocks install https://raw.githubusercontent.com/moonlibs/indexpiration/master/rockspecs/indexpiration-scm-1.rockspec && tarantool /opt/tarantool/init_standalone.lua"
+          # for debug..
+          # sleep 3
+          # docker ps -a
+          # docker logs $(docker ps -aqf "name=tarantool")
+
+      - name: Checkout centrifo repo
+        working-directory: ../centrifugo
+        run: ls
+
       - name: Test
         run: make test
+
+      - name: Integration Test
+        run: make test-integration
